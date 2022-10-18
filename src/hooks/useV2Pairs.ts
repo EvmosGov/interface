@@ -3,9 +3,9 @@ import { useMemo } from 'react'
 import { abi as IUniswapV2PairABI } from '@uniswap/v2-core/build/IUniswapV2Pair.json'
 import { Interface } from '@ethersproject/abi'
 import { useActiveWeb3React } from './web3'
-import { useMultipleContractSingleData } from '../state/multicall/hooks'
 import { wrappedCurrency } from '../utils/wrappedCurrency'
 import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
+import { useMultipleContractSingleDataChunked } from 'state/multicall/chunked-call'
 
 const PAIR_INTERFACE = new Interface(IUniswapV2PairABI)
 
@@ -36,7 +36,7 @@ export function useV2Pairs(currencies: [Currency | undefined, Currency | undefin
     [tokens]
   )
 
-  const results = useMultipleContractSingleData(pairAddresses, PAIR_INTERFACE, 'getReserves')
+  const results = useMultipleContractSingleDataChunked(pairAddresses, PAIR_INTERFACE, 'getReserves')
 
   return useMemo(() => {
     return results.map((result, i) => {

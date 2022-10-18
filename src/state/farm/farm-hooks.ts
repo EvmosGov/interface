@@ -11,7 +11,8 @@ import JSBI from 'jsbi'
 import { useMemo } from 'react'
 import { BigintIsh } from 'sdk-core/constants'
 import { Currency, CurrencyAmount, Token } from 'sdk-core/entities'
-import { NEVER_RELOAD, useSingleCallResult, useSingleContractMultipleData } from 'state/multicall/hooks'
+import { NEVER_RELOAD, useSingleCallResult } from 'state/multicall/hooks'
+import { useSingleContractMultipleDataChunked } from 'state/multicall/chunked-call'
 import { useTokenBalance } from 'state/wallet/hooks'
 import { isTruthy } from 'utils/isTruthy'
 import { Pair } from 'v2-sdk/entities'
@@ -52,35 +53,35 @@ export function usePools() {
   const allIndizes = new Array(poolLengthAmount.toNumber()).fill('').map((_, id) => id)
   const poolIndizes = allIndizes //.filter((a) => !NOMAD_POOLS.includes(a))
 
-  const poolInfos = useSingleContractMultipleData(
+  const poolInfos = useSingleContractMultipleDataChunked(
     minichefContract,
     'poolInfo',
     poolIndizes.map((id) => [id]),
     { blocksPerFetch: 26 }
   )
-  const lpTokens = useSingleContractMultipleData(
+  const lpTokens = useSingleContractMultipleDataChunked(
     minichefContract,
     'lpToken',
     poolIndizes.map((id) => [id]),
-    { blocksPerFetch: 27 }
-  )
-
-  const rewarders = useSingleContractMultipleData(
-    minichefContract,
-    'rewarder',
-    poolIndizes.map((id) => [id]),
-    { blocksPerFetch: 28 }
-  )
-
-  const userInfos = useSingleContractMultipleData(
-    minichefContract,
-    'userInfo',
-    poolIndizes.map((id) => [id, account ?? undefined]),
     { blocksPerFetch: 29 }
   )
 
+  const rewarders = useSingleContractMultipleDataChunked(
+    minichefContract,
+    'rewarder',
+    poolIndizes.map((id) => [id]),
+    { blocksPerFetch: 31 }
+  )
+
+  const userInfos = useSingleContractMultipleDataChunked(
+    minichefContract,
+    'userInfo',
+    poolIndizes.map((id) => [id, account ?? undefined]),
+    { blocksPerFetch: 37 }
+  )
+
   const diffusionPerSecondResponse = useSingleCallResult(minichefContract, 'diffusionPerSecond', [], {
-    blocksPerFetch: 22,
+    blocksPerFetch: 34,
   })
   const diffusionPerSecond = diffusionPerSecondResponse.result?.[0]
     ? JSBI.BigInt(diffusionPerSecondResponse.result[0].toString())
@@ -90,9 +91,14 @@ export function usePools() {
   const totalAllocation = totalAllocationResponse.result?.[0] as BigNumber | undefined
 
   const pendingArguments = account ? poolIndizes.map((pid) => [pid, account]) : []
-  const pendingDiffusions = useSingleContractMultipleData(minichefContract, 'pendingDiffusion', pendingArguments, {
-    blocksPerFetch: 4,
-  })
+  const pendingDiffusions = useSingleContractMultipleDataChunked(
+    minichefContract,
+    'pendingDiffusion',
+    pendingArguments,
+    {
+      blocksPerFetch: 4,
+    }
+  )
 
   const pools: MinichefRawPoolInfo[] = useMemo(() => {
     return poolIndizes
