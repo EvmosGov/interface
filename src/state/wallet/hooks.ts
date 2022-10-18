@@ -7,11 +7,12 @@ import { useAllTokens } from '../../hooks/Tokens'
 import { useMulticall2Contract } from '../../hooks/useContract'
 import { isAddress } from '../../utils'
 import { useUserUnclaimedAmount } from '../claim/hooks'
-import { useMultipleContractSingleData, useSingleContractMultipleData } from '../multicall/hooks'
+import { useSingleContractMultipleData } from '../multicall/hooks'
 import { useTotalUniEarned } from '../stake/hooks'
 import { Interface } from '@ethersproject/abi'
 import ERC20ABI from 'abis/erc20.json'
 import { Erc20Interface } from 'abis/types/Erc20'
+import { useMultipleContractSingleDataChunked } from 'state/multicall/chunked-call'
 
 /**
  * Returns a map of the given addresses to their eventually consistent ETH balances.
@@ -64,7 +65,7 @@ export function useTokenBalancesWithLoadingIndicator(
 
   const validatedTokenAddresses = useMemo(() => validatedTokens.map((vt) => vt.address), [validatedTokens])
   const ERC20Interface = new Interface(ERC20ABI) as Erc20Interface
-  const balances = useMultipleContractSingleData(
+  const balances = useMultipleContractSingleDataChunked(
     validatedTokenAddresses,
     ERC20Interface,
     'balanceOf',

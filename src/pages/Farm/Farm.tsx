@@ -119,7 +119,7 @@ export default function Manage({ match: { params } }: RouteComponentProps<{ pool
   const valueOfTotalStakedAmountInUSDC = useFarmTVL(pair ?? undefined, totalPoolStaked)
   const primaryAPR = useCalculateAPR(poolEmissionAmount, valueOfTotalStakedAmountInUSDC)
   const secondaryAPR = useCalculateAPR(rewardPerSecondAmount, valueOfTotalStakedAmountInUSDC)
-  const totalAPR = JSBI.add(primaryAPR || JSBI.BigInt(0), secondaryAPR || JSBI.BigInt(0))
+  const totalAPR = JSBI.add(primaryAPR?.quotient || JSBI.BigInt(0), secondaryAPR?.quotient || JSBI.BigInt(0))
 
   const [token0Deposited, token1Deposited] =
     !!pair &&

@@ -50,35 +50,32 @@ export function usePools() {
   const poolLength = useSingleCallResult(minichefContract, 'poolLength', [], { blocksPerFetch: 25 })
 
   const poolLengthAmount = (poolLength?.result?.pools as BigNumber) || BigNumber.from(0)
-  const allIndizes = new Array(poolLengthAmount.toNumber()).fill('').map((_, id) => id)
-  const poolIndizes = allIndizes //.filter((a) => !NOMAD_POOLS.includes(a))
+  const poolLengthNumber = poolLengthAmount.toNumber()
+  const { poolIndizesArguments, poolIndizesAccountArguments, pendingArguments, poolIndizes } = useMemo(() => {
+    const allIndizes = new Array(poolLengthNumber).fill('').map((_, id) => id)
+    const poolIndizes = allIndizes //.filter((a) => !NOMAD_POOLS.includes(a))
+    return {
+      poolIndizesArguments: poolIndizes.map((id) => [id]),
+      poolIndizesAccountArguments: poolIndizes.map((id) => [id, account ?? undefined]),
+      pendingArguments: account ? poolIndizes.map((pid) => [pid, account]) : [],
+      poolIndizes,
+    }
+  }, [poolLengthNumber, account])
 
-  const poolInfos = useSingleContractMultipleDataChunked(
-    minichefContract,
-    'poolInfo',
-    poolIndizes.map((id) => [id]),
-    { blocksPerFetch: 26 }
-  )
-  const lpTokens = useSingleContractMultipleDataChunked(
-    minichefContract,
-    'lpToken',
-    poolIndizes.map((id) => [id]),
-    { blocksPerFetch: 29 }
-  )
+  const poolInfos = useSingleContractMultipleDataChunked(minichefContract, 'poolInfo', poolIndizesArguments, {
+    blocksPerFetch: 26,
+  })
+  const lpTokens = useSingleContractMultipleDataChunked(minichefContract, 'lpToken', poolIndizesArguments, {
+    blocksPerFetch: 29,
+  })
 
-  const rewarders = useSingleContractMultipleDataChunked(
-    minichefContract,
-    'rewarder',
-    poolIndizes.map((id) => [id]),
-    { blocksPerFetch: 31 }
-  )
+  const rewarders = useSingleContractMultipleDataChunked(minichefContract, 'rewarder', poolIndizesArguments, {
+    blocksPerFetch: 31,
+  })
 
-  const userInfos = useSingleContractMultipleDataChunked(
-    minichefContract,
-    'userInfo',
-    poolIndizes.map((id) => [id, account ?? undefined]),
-    { blocksPerFetch: 37 }
-  )
+  const userInfos = useSingleContractMultipleDataChunked(minichefContract, 'userInfo', poolIndizesAccountArguments, {
+    blocksPerFetch: 37,
+  })
 
   const diffusionPerSecondResponse = useSingleCallResult(minichefContract, 'diffusionPerSecond', [], {
     blocksPerFetch: 34,
@@ -90,7 +87,6 @@ export function usePools() {
   const totalAllocationResponse = useSingleCallResult(minichefContract, 'totalAllocPoint', [], { blocksPerFetch: 4 })
   const totalAllocation = totalAllocationResponse.result?.[0] as BigNumber | undefined
 
-  const pendingArguments = account ? poolIndizes.map((pid) => [pid, account]) : []
   const pendingDiffusions = useSingleContractMultipleDataChunked(
     minichefContract,
     'pendingDiffusion',
@@ -145,6 +141,7 @@ export function usePools() {
         return rawInfo
       })
       .filter(isTruthy)
+      .filter((pool) => pool.lpTokenAddress)
   }, [
     account,
     chainId,
@@ -157,23 +154,25 @@ export function usePools() {
     userInfos,
     poolIndizes,
   ])
-  return pools.filter((pool) => pool.lpTokenAddress)
+  return pools
 }
 
 export function usePoolTVL(pair?: Pair) {
   const valueToken0 = useUSDCValue(pair?.reserve0)
   const valueToken1 = useUSDCValue(pair?.reserve1)
 
-  return valueToken0?.multiply(2) || valueToken1?.multiply(2)
+  return useMemo(() => valueToken0?.multiply(2) || valueToken1?.multiply(2), [valueToken0, valueToken1])
 }
 
 export function useFarmTVL(pair?: Pair, totalAmountStaked?: CurrencyAmount<Currency>) {
   const totalPoolValue = usePoolTVL(pair)
   const totalSupplyOfStakingToken = useTotalSupply(totalAmountStaked?.currency)
-  if (totalPoolValue && totalSupplyOfStakingToken && totalAmountStaked) {
-    return totalPoolValue.multiply(totalAmountStaked.quotient).divide(totalSupplyOfStakingToken)
-  }
-  return undefined
+  return useMemo(() => {
+    if (totalPoolValue && totalSupplyOfStakingToken && totalAmountStaked) {
+      return totalPoolValue.multiply(totalAmountStaked.quotient).divide(totalSupplyOfStakingToken)
+    }
+    return undefined
+  }, [totalPoolValue, totalAmountStaked])
 }
 
 export function usePool(poolId: number) {
@@ -268,6 +267,7 @@ export function useRewardInfos(pid: number, rewardContractAddress?: string) {
       // console.log('No RewardToken')
       return undefined
     }
+    console.log('rewardPerSecondAmount', pid)
 
     const totalRewardPerSecond: JSBI = JSBI.BigInt(rewardPerSecondResponse.result?.[0].toString() || 0)
     // console.log('poolInfo?.allocPoint', poolInfo?.allocPoint, 'totalAllocation', totalAllocation)
@@ -328,21 +328,27 @@ export function useOwnWeeklyEmission(
 }
 
 export function useCalculateAPR(poolEmissionPerSecond?: CurrencyAmount<Token>, farmTVL?: CurrencyAmount<Token>) {
-  // return JSBI.BigInt(0)
   const fractionOfPool = 1000
-
-  const hypotheticalEmissionPerYear = poolEmissionPerSecond
-    ?.multiply(JSBI.BigInt(60 * 60 * 24 * 365))
-    .divide(fractionOfPool)
+  const hypotheticalEmissionPerYear = useMemo(() => {
+    console.log(
+      'hypotheticalEmissionPerYear',
+      poolEmissionPerSecond?.currency.address,
+      poolEmissionPerSecond?.toExact()
+    )
+    const emission = poolEmissionPerSecond?.multiply(JSBI.BigInt(60 * 60 * 24 * 365)).divide(fractionOfPool)
+    return emission
+  }, [poolEmissionPerSecond?.currency.address, poolEmissionPerSecond?.toExact()])
 
   const valueOfYearlyEmission = useUSDCValue(hypotheticalEmissionPerYear)
 
-  const inputAmount = farmTVL?.divide(fractionOfPool)
-
-  const apr =
+  const apr = useMemo(() => {
+    const inputAmount = farmTVL?.divide(fractionOfPool)
     valueOfYearlyEmission && inputAmount && JSBI.greaterThan(inputAmount.quotient, JSBI.BigInt('0'))
       ? JSBI.divide(valueOfYearlyEmission?.multiply(100).quotient, inputAmount?.quotient)
       : JSBI.BigInt(0)
+
+    return valueOfYearlyEmission
+  }, [farmTVL?.currency.address, farmTVL?.toExact(), valueOfYearlyEmission])
 
   return apr
 }

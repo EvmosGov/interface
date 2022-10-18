@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react'
+import React, { Fragment, useEffect, useMemo } from 'react'
 
 // import { CurrencyAmount, Token } from 'sdk-core/entities'
 
@@ -39,6 +39,10 @@ const FarmListContainer = styled.div`
 export function FarmListPage() {
   const pools = usePools()
 
+  useEffect(() => {
+    console.log('FarmListPage', pools.length)
+  }, [pools])
+
   return (
     <FarmListContainer>
       <Tux />
@@ -68,29 +72,40 @@ export function PoolRow({
   const { rewardPerSecondAmount } = useRewardInfos(poolId, rewarderAddress)
 
   const tvl = useFarmTVL(pair ?? undefined, totalPoolStaked)
+
+  useEffect(() => {
+    console.log('poolrow', 'tvl')
+  }, [tvl])
+  useEffect(() => {
+    console.log('poolrow', 'poolEmissionAmount')
+  }, [poolEmissionAmount])
+
   const primaryAPR = useCalculateAPR(poolEmissionAmount, tvl)
   const secondaryAPR = useCalculateAPR(rewardPerSecondAmount, tvl)
-  const totalAPR = JSBI.add(primaryAPR || JSBI.BigInt(0), secondaryAPR || JSBI.BigInt(0))
+  const totalAPR = JSBI.add(primaryAPR?.quotient || JSBI.BigInt(0), secondaryAPR?.quotient || JSBI.BigInt(0))
 
   const stakedAmount = lpToken ? CurrencyAmount.fromRawAmount(lpToken, stakedRawAmount || 0) : undefined
   const totalPoolTokens = useTotalSupply(lpToken ?? undefined)
 
-  const [token0Deposited, token1Deposited] =
-    !!pair &&
-    !!totalPoolTokens &&
-    !!stakedAmount &&
-    // this condition is a short-circuit in the case where useTokenBalance updates sooner than useTotalSupply
-    JSBI.greaterThanOrEqual(totalPoolTokens.quotient, stakedAmount.quotient)
-      ? [
-          pair.getLiquidityValue(pair.token0, totalPoolTokens, stakedAmount, false),
-          pair.getLiquidityValue(pair.token1, totalPoolTokens, stakedAmount, false),
-        ]
-      : [undefined, undefined]
+  const [token0Deposited, token1Deposited] = useMemo(
+    () =>
+      !!pair &&
+      !!totalPoolTokens &&
+      !!stakedAmount &&
+      // this condition is a short-circuit in the case where useTokenBalance updates sooner than useTotalSupply
+      JSBI.greaterThanOrEqual(totalPoolTokens.quotient, stakedAmount.quotient)
+        ? [
+            pair.getLiquidityValue(pair.token0, totalPoolTokens, stakedAmount, false),
+            pair.getLiquidityValue(pair.token1, totalPoolTokens, stakedAmount, false),
+          ]
+        : [undefined, undefined],
+    [pair, totalPoolTokens, stakedAmount]
+  )
 
   const token0Value = useUSDCValue(token0Deposited)
   const token1Value = useUSDCValue(token1Deposited)
 
-  const positionValue = token0Value?.multiply(2) || token1Value?.multiply(2)
+  const positionValue = useMemo(() => token0Value?.multiply(2) || token1Value?.multiply(2), [token0Value, token1Value])
 
   const isActive =
     positionValue?.greaterThan(0) || poolEmissionAmount?.greaterThan(0) || rewardPerSecondAmount?.greaterThan(0)
