@@ -22,7 +22,7 @@ export function PoolListPagination({
         {pageButtons.map((page) => {
           return (
             <ButtonPrimary key={page} onClick={() => setPage(page)} disabled={currentPage === page}>
-              {page}
+              {page + 1}
             </ButtonPrimary>
           )
         })}
