@@ -352,7 +352,7 @@ export default function Header() {
             {t('Stake')}
           </StyledNavLink>
           <BridgeMenu />
-          <StyledExternalLink id={`charts-nav-link`} href="https://info.diffusion.fi">
+          <StyledExternalLink id={`charts-nav-link`} href="https://dexscreener.com/evmos/diffusion">
             {t('Charts')}
             <sup>↗</sup>
           </StyledExternalLink>
